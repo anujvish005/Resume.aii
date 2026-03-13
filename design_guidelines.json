@@ -1,0 +1,150 @@
+{
+  "identity": {
+    "name": "E1",
+    "archetype": "The Swiss Architect",
+    "core_philosophy": "Precision, Clarity, and Objective Truth. The resume is a document of fact; the tool must feel like a precision instrument.",
+    "emotional_tone": "Competent, Direct, uncluttered, and efficient."
+  },
+  "typography": {
+    "primary_font": "Instrument Sans",
+    "secondary_font": "Inter",
+    "google_fonts_url": "https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Inter:wght@400;500;600&display=swap",
+    "usage": {
+      "headings": {
+        "family": "Instrument Sans, sans-serif",
+        "weights": "font-semibold (600) or font-bold (700)",
+        "tracking": "tracking-tight (-0.02em)",
+        "style": "Sharp, geometric, commanding."
+      },
+      "body": {
+        "family": "Inter, sans-serif",
+        "weights": "font-normal (400)",
+        "tracking": "tracking-normal",
+        "style": "Legible, neutral, invisible."
+      }
+    }
+  },
+  "colors": {
+    "palette": {
+      "name": "Swiss Indigo & Clay",
+      "background": "#FFFFFF",
+      "surface": "#F8FAFC", 
+      "foreground": "#0F172A",
+      "primary": "#4F46E5",
+      "primary_foreground": "#FFFFFF",
+      "accent": "#E0E7FF",
+      "border": "#E2E8F0"
+    },
+    "tailwind_config_extension": {
+      "colors": {
+        "swiss-red": "#FF3B30",
+        "paper": "#FFFFFF",
+        "ink": "#111111",
+        "subtle": "#94A3B8"
+      }
+    },
+    "rules": [
+      "No gradients on backgrounds. Use flat, solid colors.",
+      "High contrast is mandatory. Text must be #0F172A or #334155, never lighter for body text.",
+      "Use 'Electric Indigo' (#4F46E5) sparingly - only for primary actions and active states."
+    ]
+  },
+  "visual_enhancers": {
+    "grid_lines": {
+      "description": "Visible grid lines separating sections to emphasize structure.",
+      "implementation": "border-r border-b border-slate-100"
+    },
+    "typography_scale": {
+      "hero": "text-5xl md:text-7xl font-semibold tracking-tighter leading-[1.1]",
+      "section_title": "text-2xl font-medium tracking-tight",
+      "label": "text-xs font-semibold uppercase tracking-widest text-slate-500"
+    },
+    "decoration": {
+      "style": "Minimalist. No illustrations. Use abstract geometric shapes or high-quality photography.",
+      "textures": "Subtle grain on the background (opacity 0.02) to soften the digital harshness."
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#4F46E5] text-white hover:bg-[#4338CA] rounded-md px-8 py-3 font-medium transition-all active:scale-95 shadow-sm hover:shadow-md",
+      "secondary": "bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 rounded-md px-8 py-3 font-medium transition-all"
+    },
+    "inputs": {
+      "style": "bg-slate-50 border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-md h-12 px-4 transition-all",
+      "label_style": "text-sm font-medium text-slate-700 mb-1.5 block"
+    },
+    "cards": {
+      "style": "bg-white border border-slate-100 shadow-sm rounded-lg p-6 hover:border-indigo-100 transition-colors",
+      "hover": "hover:shadow-md hover:-translate-y-1 transition-all duration-300"
+    },
+    "resume_preview": {
+      "style": "bg-white shadow-2xl shadow-slate-200/50 border border-slate-100 aspect-[1/1.414] w-full max-w-[800px] mx-auto p-[10mm] text-left transform origin-top transition-transform"
+    }
+  },
+  "layout_strategies": {
+    "landing_page": {
+      "hero": "Split screen or Center-aligned with massive typography. 'Grid' layout preferred.",
+      "grid_system": "grid grid-cols-12 gap-x-6 gap-y-12"
+    },
+    "builder_page": {
+      "layout": "Fixed split-screen. Left 40% scrollable (Form), Right 60% fixed (Preview). On mobile, stack them with a 'Preview' toggle.",
+      "spacing": "Dense in the form, spacious in the preview."
+    }
+  },
+  "image_urls": {
+    "hero_background": {
+      "url": "https://images.unsplash.com/photo-1760236963218-424a715d1816?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "alt": "Minimalist workspace top view",
+      "usage": "Hero section background with heavy overlay or side image"
+    },
+    "feature_context": {
+      "url": "https://images.unsplash.com/photo-1759296844873-e0c694c24284?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "alt": "Writing tools on desk",
+      "usage": "Features section visual"
+    },
+    "testimonials": [
+      {
+        "url": "https://images.unsplash.com/photo-1634552516330-ab1ccc0f605e?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Professional woman smiling"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1671718648167-6b209c182480?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Professional man smiling"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1652772589253-c1ab2308fbf4?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Professional woman bw smiling"
+      }
+    ]
+  },
+  "motion": {
+    "libraries": ["framer-motion"],
+    "preferences": {
+      "reduced_motion": "respect-preference",
+      "style": "Quick, snappy, non-bouncy. Ease-out-quart (0.25, 1, 0.5, 1)."
+    },
+    "interactions": {
+      "hover": "scale(1.02) or translateY(-2px)",
+      "page_load": "staggerChildren: 0.1, delayChildren: 0.2",
+      "resume_update": "Animate content changes with layout preservation (layout prop in framer-motion)."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Install 'framer-motion', 'lucide-react', 'clsx', 'tailwind-merge' if not present.",
+    "Use 'Instrument Sans' for all Headings. Import it in index.css.",
+    "The Resume Builder Page MUST use a Split-Screen layout on Desktop. Form on Left, Preview on Right.",
+    "Do NOT use standard HTML date pickers. Use a custom styled text input or Shadcn Popover + Calendar.",
+    "Ensure the PDF download matches the visual preview exactly. Suggest using 'react-to-print' or 'jspdf'.",
+    "Keep the Resume Templates SIMPLE. ATS-friendly means: No columns (or simple 2-col), standard headings, bullet points, no graphics.",
+    "For the Landing Page: Use the 'Bento Grid' layout for features.",
+    "Implement a 'Score Meter' in the builder that updates as the user fills data (gamification)."
+  ],
+  "universal_guidelines": [
+    "Avoid 'AI Slop': No generic gradients, no centered everything, no default shadows.",
+    "Micro-animations: Every button click, hover, and input focus must have feedback.",
+    "Spacing: Use 'p-8' or 'gap-8' as your default unit. Allow breathing room.",
+    "Dark Mode: Implement it, but optimize it to be 'Anthracite' (#111), not Pitch Black (#000).",
+    "Accessibility: Ensure all text inputs have associated labels and ARIA descriptions.",
+    "Testing: Add data-testid to all major interactive elements (e.g., 'resume-form-submit', 'add-experience-btn')."
+  ]
+}
