@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
+from openai import AsyncOpenAI
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -22,6 +23,9 @@ db = client[os.environ['DB_NAME']]
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
+
+# OpenAI client
+openai_client = AsyncOpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
 
 # Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -101,16 +105,16 @@ def extract_text_from_docx(file_path: str) -> str:
 
 # ─── Helper: Parse resume text with AI ────────────────────────────
 async def parse_resume_with_ai(text: str) -> dict:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    api_key = os.environ.get('OPENAI_API_KEY')
     if not api_key:
-        raise HTTPException(status_code=500, detail="LLM API key not configured")
-    
-    chat = LlmChat(
-        api_key=api_key,
-        session_id=f"resume-parse-{uuid.uuid4()}",
-        system_message="""You are a resume parser. Extract structured data from the resume text provided. 
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+
+    response = await openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": """You are a resume parser. Extract structured data from the resume text provided.
 Return ONLY valid JSON with this exact structure (no markdown, no extra text):
 {
   "contact": {"full_name": "", "email": "", "phone": "", "location": "", "linkedin": "", "website": ""},
@@ -123,13 +127,16 @@ Return ONLY valid JSON with this exact structure (no markdown, no extra text):
   "languages": []
 }
 Fill in all fields you can find. Use empty strings for missing fields. For dates use format like "Jan 2023" or "2023"."""
-    ).with_model("openai", "gpt-4.1")
-    
-    user_message = UserMessage(text=f"Parse this resume:\n\n{text}")
-    response = await chat.send_message(user_message)
-    
-    # Clean the response - remove markdown code blocks if present
-    cleaned = response.strip()
+            },
+            {
+                "role": "user",
+                "content": f"Parse this resume:\n\n{text}"
+            }
+        ],
+        temperature=0.1,
+    )
+
+    cleaned = response.choices[0].message.content.strip()
     if cleaned.startswith("```"):
         cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
     if cleaned.endswith("```"):
@@ -137,7 +144,7 @@ Fill in all fields you can find. Use empty strings for missing fields. For dates
     if cleaned.startswith("json"):
         cleaned = cleaned[4:]
     cleaned = cleaned.strip()
-    
+
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
@@ -153,26 +160,25 @@ async def root():
 async def upload_resume(file: UploadFile = File(...)):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
-    
+
     ext = file.filename.lower().split(".")[-1]
     if ext not in ("pdf", "docx"):
         raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported")
-    
-    # Save temporarily
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp:
         content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
-    
+
     try:
         if ext == "pdf":
             text = extract_text_from_pdf(tmp_path)
         else:
             text = extract_text_from_docx(tmp_path)
-        
+
         if not text.strip():
             raise HTTPException(status_code=400, detail="Could not extract text from the file. The file may be scanned/image-based.")
-        
+
         parsed = await parse_resume_with_ai(text)
         return {"success": True, "data": parsed}
     finally:
@@ -194,23 +200,29 @@ async def get_resume(resume_id: str):
 
 @api_router.post("/resume/enhance")
 async def enhance_text(req: EnhanceRequest):
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    
-    api_key = os.environ.get('EMERGENT_LLM_KEY')
+    api_key = os.environ.get('OPENAI_API_KEY')
     if not api_key:
-        raise HTTPException(status_code=500, detail="LLM API key not configured")
-    
-    chat = LlmChat(
-        api_key=api_key,
-        session_id=f"enhance-{uuid.uuid4()}",
-        system_message="""You are an expert resume writer. Enhance the given text to be more impactful, 
-professional, and ATS-friendly. Use strong action verbs, quantify achievements where possible, 
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+
+    response = await openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": """You are an expert resume writer. Enhance the given text to be more impactful,
+professional, and ATS-friendly. Use strong action verbs, quantify achievements where possible,
 and keep it concise. Return ONLY the enhanced text, no explanations or extra formatting."""
-    ).with_model("openai", "gpt-4.1")
-    
-    user_message = UserMessage(text=f"Context: {req.context}\n\nEnhance this resume text:\n{req.text}")
-    response = await chat.send_message(user_message)
-    return {"success": True, "enhanced": response.strip()}
+            },
+            {
+                "role": "user",
+                "content": f"Context: {req.context}\n\nEnhance this resume text:\n{req.text}"
+            }
+        ],
+        temperature=0.7,
+    )
+
+    enhanced = response.choices[0].message.content.strip()
+    return {"success": True, "enhanced": enhanced}
 
 # Include router and middleware
 app.include_router(api_router)
