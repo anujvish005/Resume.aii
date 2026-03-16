@@ -6,12 +6,12 @@ import os
 import logging
 import json
 import tempfile
+import httpx
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
-from openai import AsyncOpenAI
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -24,16 +24,40 @@ db = client[os.environ['DB_NAME']]
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
-# ─── Lazy OpenAI client ───────────────────────────────────────────
-def get_openai_client():
-    api_key = os.environ.get('OPENAI_API_KEY')
-    if not api_key:
-        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
-    return AsyncOpenAI(api_key=api_key)
-
 # Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# ─── Gemini API helper ────────────────────────────────────────────
+async def call_gemini(prompt: str) -> str:
+    api_key = os.environ.get('GEMINI_API_KEY')
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Gemini API key not configured")
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt}
+                ]
+            }
+        ],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 2048
+        }
+    }
+
+    async with httpx.AsyncClient(timeout=60.0) as http_client:
+        response = await http_client.post(url, json=payload)
+        if response.status_code != 200:
+            logger.error(f"Gemini API error: {response.text}")
+            raise HTTPException(status_code=500, detail=f"Gemini API error: {response.status_code}")
+
+        data = response.json()
+        return data["candidates"][0]["content"]["parts"][0]["text"]
 
 # ─── Models ────────────────────────────────────────────────────────
 class ContactInfo(BaseModel):
@@ -109,34 +133,27 @@ def extract_text_from_docx(file_path: str) -> str:
 
 # ─── Helper: Parse resume text with AI ────────────────────────────
 async def parse_resume_with_ai(text: str) -> dict:
-    response = await get_openai_client().chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": """You are a resume parser. Extract structured data from the resume text provided.
-Return ONLY valid JSON with this exact structure (no markdown, no extra text):
-{
-  "contact": {"full_name": "", "email": "", "phone": "", "location": "", "linkedin": "", "website": ""},
+    prompt = f"""You are a resume parser. Extract structured data from the resume text provided.
+Return ONLY valid JSON with this exact structure (no markdown, no extra text, no code blocks):
+{{
+  "contact": {{"full_name": "", "email": "", "phone": "", "location": "", "linkedin": "", "website": ""}},
   "summary": "",
-  "experience": [{"company": "", "position": "", "start_date": "", "end_date": "", "current": false, "description": ""}],
-  "education": [{"institution": "", "degree": "", "field_of_study": "", "start_date": "", "end_date": "", "gpa": ""}],
+  "experience": [{{"company": "", "position": "", "start_date": "", "end_date": "", "current": false, "description": ""}}],
+  "education": [{{"institution": "", "degree": "", "field_of_study": "", "start_date": "", "end_date": "", "gpa": ""}}],
   "skills": [],
-  "projects": [{"name": "", "description": "", "technologies": "", "link": ""}],
-  "certifications": [{"name": "", "issuer": "", "date": ""}],
+  "projects": [{{"name": "", "description": "", "technologies": "", "link": ""}}],
+  "certifications": [{{"name": "", "issuer": "", "date": ""}}],
   "languages": []
-}
-Fill in all fields you can find. Use empty strings for missing fields. For dates use format like "Jan 2023" or "2023"."""
-            },
-            {
-                "role": "user",
-                "content": f"Parse this resume:\n\n{text}"
-            }
-        ],
-        temperature=0.1,
-    )
+}}
+Fill in all fields you can find. Use empty strings for missing fields. For dates use format like "Jan 2023" or "2023".
 
-    cleaned = response.choices[0].message.content.strip()
+Resume text:
+{text}"""
+
+    raw = await call_gemini(prompt)
+
+    # Clean response
+    cleaned = raw.strip()
     if cleaned.startswith("```"):
         cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
     if cleaned.endswith("```"):
@@ -148,7 +165,7 @@ Fill in all fields you can find. Use empty strings for missing fields. For dates
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
-        logger.error(f"Failed to parse AI response: {cleaned[:200]}")
+        logger.error(f"Failed to parse Gemini response: {cleaned[:200]}")
         raise HTTPException(status_code=500, detail="Failed to parse resume data from AI response")
 
 # ─── Routes ───────────────────────────────────────────────────────
@@ -200,25 +217,17 @@ async def get_resume(resume_id: str):
 
 @api_router.post("/resume/enhance")
 async def enhance_text(req: EnhanceRequest):
-    response = await get_openai_client().chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": """You are an expert resume writer. Enhance the given text to be more impactful,
+    prompt = f"""You are an expert resume writer. Enhance the given text to be more impactful,
 professional, and ATS-friendly. Use strong action verbs, quantify achievements where possible,
-and keep it concise. Return ONLY the enhanced text, no explanations or extra formatting."""
-            },
-            {
-                "role": "user",
-                "content": f"Context: {req.context}\n\nEnhance this resume text:\n{req.text}"
-            }
-        ],
-        temperature=0.7,
-    )
+and keep it concise. Return ONLY the enhanced text, no explanations or extra formatting.
 
-    enhanced = response.choices[0].message.content.strip()
-    return {"success": True, "enhanced": enhanced}
+Context: {req.context}
+
+Text to enhance:
+{req.text}"""
+
+    enhanced = await call_gemini(prompt)
+    return {"success": True, "enhanced": enhanced.strip()}
 
 # Include router and middleware
 app.include_router(api_router)
