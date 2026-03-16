@@ -24,8 +24,12 @@ db = client[os.environ['DB_NAME']]
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
-# OpenAI client
-openai_client = AsyncOpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+# ─── Lazy OpenAI client ───────────────────────────────────────────
+def get_openai_client():
+    api_key = os.environ.get('OPENAI_API_KEY')
+    if not api_key:
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+    return AsyncOpenAI(api_key=api_key)
 
 # Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -105,11 +109,7 @@ def extract_text_from_docx(file_path: str) -> str:
 
 # ─── Helper: Parse resume text with AI ────────────────────────────
 async def parse_resume_with_ai(text: str) -> dict:
-    api_key = os.environ.get('OPENAI_API_KEY')
-    if not api_key:
-        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
-
-    response = await openai_client.chat.completions.create(
+    response = await get_openai_client().chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {
@@ -200,11 +200,7 @@ async def get_resume(resume_id: str):
 
 @api_router.post("/resume/enhance")
 async def enhance_text(req: EnhanceRequest):
-    api_key = os.environ.get('OPENAI_API_KEY')
-    if not api_key:
-        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
-
-    response = await openai_client.chat.completions.create(
+    response = await get_openai_client().chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {
